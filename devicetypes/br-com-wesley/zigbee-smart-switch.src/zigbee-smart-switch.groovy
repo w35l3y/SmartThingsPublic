@@ -63,8 +63,7 @@ metadata {
 }
 
 def getChildCount() {
-	return 3
-	/*switch (zigbee.model) {
+	switch (device.getDataValue("model")) {
 		case "FNB56-ZSW03LX2.0":
 			return 3
 		case "FNB56-ZSW02LX2.0":
@@ -75,7 +74,7 @@ def getChildCount() {
 		default:
         log.debug "Default Child Count"
 			return 2
-	}*/
+	}
 }
 
 def getInitialEndpoint() { Integer.parseInt(zigbee.endpointId?:0x01, 10) }
