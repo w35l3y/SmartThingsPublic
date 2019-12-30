@@ -160,7 +160,7 @@ def createChildDevices () {
 		(2..getChildCount()).each {
 			addChildDevice("Zemismart ZigBee Smart Switch Child", "${device.deviceNetworkId}:${getHexEndpoint(it-1)}", device.hubId, [
 				isComponent: false,
-				componentName: "switch$it",
+				componentName: "main",
 				completedSetup: true,
 				componentLabel: "#$it",
 				label: "${device.displayName} $it",
