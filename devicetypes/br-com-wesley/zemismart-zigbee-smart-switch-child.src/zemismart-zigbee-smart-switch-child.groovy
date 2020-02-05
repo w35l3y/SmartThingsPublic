@@ -26,6 +26,7 @@ metadata {
 
     //    Zemismart HGZB-42
     fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008", outClusters: "0019", manufacturer: "3A Smart Home DE", model: "LXN-2S27LX1.0", deviceJoinName: "ZigBee Smart Switch"
+    fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008", outClusters: "0019", manufacturer: "FeiBit", model: "FNB56-ZSW02LX2.0", deviceJoinName: "ZigBee Smart Switch"
 
     //    Zemismart HGZB-43
     fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008", outClusters: "0019", manufacturer: "FeiBit", model: "FNB56-ZSW03LX2.0", deviceJoinName: "ZigBee Smart Switch"
@@ -38,7 +39,7 @@ metadata {
             state ("turningOn", label: '${name}', action: "off", icon: "st.switches.light.on", backgroundColor: "#00a0dc", nextState: "turningOff")
         }
 
-        controlTile("level", "device.level", "slider", height: 2, width: 2, canChangeIcon: true, decoration: "flat", inactiveLabel: false) {
+        controlTile("level", "device.level", "slider", range:"(1..9)", height: 2, width: 2, canChangeIcon: true, decoration: "flat", inactiveLabel: false) {
             state "level", action: "setLevel"
         }
 
@@ -48,9 +49,13 @@ metadata {
 }
 
 def createAndSendEvent(map) {
-    log.debug "sendEvent($map)"
+    log.debug "child[ ${device.endpointId} ].sendEvent($map)"
     sendEvent(map)
     map
+}
+
+def parse(description) {
+	log.debug "Parse Child: $description"
 }
 
 def on() { parent.on(device) }

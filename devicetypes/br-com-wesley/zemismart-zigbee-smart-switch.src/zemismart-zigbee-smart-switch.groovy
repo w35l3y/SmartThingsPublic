@@ -56,7 +56,7 @@ metadata {
             state ("turningOn", label: '${name}', action: "off", icon: "st.switches.light.on", backgroundColor: "#00a0dc", nextState: "turningOff")
         }
     
-        controlTile("level", "device.level", "slider", range:"(0..100)", height: 2, width: 2, canChangeIcon: true, decoration: "flat") {
+        controlTile("level", "device.level", "slider", range:"(1..9)", height: 2, width: 2, canChangeIcon: true, decoration: "flat") {
             state "level", action: "setLevel"
         }
 
@@ -91,6 +91,7 @@ def getEndpoint (child) { child.deviceNetworkId == device.deviceNetworkId?getIni
 
 def turn (Integer endpoint, value) {
     log.info "turn($endpoint, $value)"
+    log.debug zigbee.command(zigbee.ONOFF_CLUSTER, value, "", [destEndpoint: endpoint])
     zigbee.command(zigbee.ONOFF_CLUSTER, value, "", [destEndpoint: endpoint])
 }
 
@@ -181,7 +182,7 @@ def parse (description) {
     Map eventMap = zigbee.getEvent(description)
     Map eventDescMap = zigbee.parseDescriptionAsMap(description)
 
-    log.debug "parse($eventMap, $eventDescMap, $description)"
+    log.debug "parse($description, $eventMap, $eventDescMap)"
     if (!eventMap || !eventMap.name) {
         def clusterId = Integer.parseInt(eventDescMap?.clusterId, 16)
         if (clusterId == zigbee.ONOFF_CLUSTER) {
@@ -191,17 +192,19 @@ def parse (description) {
         }
     }
 
-    if (eventMap) {
+    /*if (!eventDescMap?.sourceEndpoint && !eventDescMap?.endpoint) {
+    	log.debug "Unknown device: $description, $eventMap, $eventDescMap"
+    } else */if (eventMap) {
         def endpoint = getHexEndpoint(0)
         if (!eventDescMap || eventDescMap.sourceEndpoint == endpoint || eventDescMap.endpoint == endpoint) {
-            log.debug "createEvent($eventMap) : " + !eventDescMap
+            log.debug "createEvent($eventMap)"
             return createEvent(eventMap)
         } else {
             def childDevice = childDevices.find {
                 it.deviceNetworkId == "${device.deviceNetworkId}:${eventDescMap.sourceEndpoint}" || it.deviceNetworkId == "${device.deviceNetworkId}:${eventDescMap.endpoint}"
             }
             if (childDevice) {
-                log.debug "child[ $childDevice ].createEvent($eventMap)"
+                log.debug "child[ ${childDevice.deviceNetworkId.split(":")[-1]} ].createEvent($eventMap)"
                 return childDevice.createEvent(childDevice.createAndSendEvent(eventMap))
             } else {
                 log.debug "Child device: ${device.deviceNetworkId}:${eventDescMap.sourceEndpoint} was not found"
