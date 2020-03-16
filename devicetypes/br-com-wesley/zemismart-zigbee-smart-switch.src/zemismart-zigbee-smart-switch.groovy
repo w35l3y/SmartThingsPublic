@@ -28,13 +28,15 @@ metadata {
 
         //    Zemismart HGZB-41
         fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008, 1000", outClusters: "0019", manufacturer: "FeiBit", model: "FNB56-ZSW01LX2.0", deviceJoinName: "ZigBee Smart Switch"
+        fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008, 1000", outClusters: "0019", manufacturer: "3A Smart Home DE", model: "LXN-1S27LX1.0", deviceJoinName: "ZigBee Smart Switch"
 
         //    Zemismart HGZB-42
-        fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008, 1000", outClusters: "0019", manufacturer: "3A Smart Home DE", model: "LXN-2S27LX1.0", deviceJoinName: "ZigBee Smart Switch"
         fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008, 1000", outClusters: "0019", manufacturer: "FeiBit", model: "FNB56-ZSW02LX2.0", deviceJoinName: "ZigBee Smart Switch"
+        fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008, 1000", outClusters: "0019", manufacturer: "3A Smart Home DE", model: "LXN-2S27LX1.0", deviceJoinName: "ZigBee Smart Switch"
 
         //    Zemismart HGZB-43
         fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008, 1000", outClusters: "0019", manufacturer: "FeiBit", model: "FNB56-ZSW03LX2.0", deviceJoinName: "ZigBee Smart Switch"
+        fingerprint profileId: "C05E", deviceId: "0000", inClusters: "0000, 0003, 0004, 0005, 0006, 0008, 1000", outClusters: "0019", manufacturer: "3A Smart Home DE", model: "LXN-3S27LX1.0", deviceJoinName: "ZigBee Smart Switch"
     }
 
     // simulator metadata
@@ -71,17 +73,17 @@ metadata {
 
 def getChildCount() {
     def model = device.getDataValue("model")
+    log.debug "Model found: " + model
     switch (model) {
-    case "FNB56-ZSW03LX2.0":
-        return 3
-    case "FNB56-ZSW02LX2.0":
-    case "LXN-2S27LX1.0":
-        return 2
-    case "FNB56-ZSW01LX2.0":
-        return 1
+    case ["FNB56-ZSW01LX2.0", "LXN-1S27LX1.0"]:
+        return 1;break;
+    case ["FNB56-ZSW02LX2.0", "LXN-2S27LX1.0"]:
+        return 2;break;
+    case ["FNB56-ZSW03LX2.0", "LXN-3S27LX1.0"]:
+        return 3;break;
     default:
         log.debug "Model not found: " + model + "\nConsider adding new fingerprint for your device."
-        return 3
+        return 3;break;
     }
 }
 
@@ -184,7 +186,7 @@ def parse (description) {
 
     log.debug "parse($description, $eventMap, $eventDescMap)"
     if (!eventMap || !eventMap.name) {
-        def clusterId = Integer.parseInt(eventDescMap?.clusterId, 16)
+        def clusterId = eventDescMap?.clusterInt
         if (clusterId == zigbee.ONOFF_CLUSTER) {
             eventMap = [name: "switch", value: eventDescMap.value]
         //} else if (clusterId == zigbee.LEVEL_CONTROL_CLUSTER) {
