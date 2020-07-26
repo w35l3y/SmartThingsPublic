@@ -30,8 +30,9 @@ metadata {
         fingerprint profileId: "0104", inClusters: "0000, 0003, 0004, 0005, 0006, 0702, 0B04", outClusters: "0003", manufacturer: "REXENSE", model: "HY0104", deviceJoinName: "HONYAR Outlet" //HONYAR Smart Outlet
         fingerprint profileId: "0104", inClusters: "0000, 0003, 0004, 0005, 0006, 0009, 0702, 0B04", outClusters: "0003, 0019", manufacturer: "HEIMAN", model: "E_Socket", deviceJoinName: "HEIMAN Outlet" //HEIMAN Smart Outlet
         fingerprint profileId: "0104", inClusters: "0000, 0003, 0004, 0005, 0006, 0B04, 0702, FC82", outClusters: "0003, 000A, 0019", manufacturer: "sengled", model: "E1C-NB7",  deviceJoinName: "Sengled Outlet" //Sengled Smart Plug with Energy Tracker
-        fingerprint profileId: "0104", inClusters: "0000, 0004, 0003, 0006, 0019, 0702, 0B04", outClusters: "0000, 0004, 0003, 0006, 0019, 0702, 0B04", manufacturer: "DAWON_DNS", model: "PM-B430-ZB", deviceJoinName: "Dawon Outlet" // DAWON DNS Smart Plug PM-B430-ZB (10A)
-        fingerprint profileId: "0104", inClusters: "0000, 0004, 0003, 0006, 0019, 0702, 0B04", outClusters: "0000, 0004, 0003, 0006, 0019, 0702, 0B04", manufacturer: "DAWON_DNS", model: "PM-B530-ZB", deviceJoinName: "Dawon Outlet" //DAWON DNS Smart Plug PM-B530-ZB (16A)
+        fingerprint manufacturer: "DAWON_DNS", model: "PM-B430-ZB", deviceJoinName: "Dawon Outlet" // DAWON DNS Smart Plug PM-B430-ZB (10A), raw description: 01 0104 0051 01 07 0000, 0004, 0003, 0006, 0019, 0702, 0B04 07 0000, 0004, 0003, 0006, 0019, 0702, 0B04
+        fingerprint manufacturer: "DAWON_DNS", model: "PM-B530-ZB", deviceJoinName: "Dawon Outlet" // DAWON DNS Smart Plug PM-B530-ZB (16A), raw description: 01 0104 0051 01 07 0000, 0004, 0003, 0006, 0019, 0702, 0B04 07 0000, 0004, 0003, 0006, 0019, 0702, 0B04
+        fingerprint manufacturer: "DAWON_DNS", model: "PM-C140-ZB", deviceJoinName: "Dawon Outlet" // DAWON DNS In-Wall Outlet PM-C140-ZB, raw description: 01 0104 0051 01 0A 0000 0002 0003 0004 0006 0019 0702 0B04 0008 0009 0A 0000 0002 0003 0004 0006 0019 0702 0B04 0008 0009
 	}
 
     tiles(scale: 2){
@@ -65,12 +66,16 @@ def getATTRIBUTE_HISTORICAL_CONSUMPTION() { 0x0400 }
 def parse(String description) {
     log.debug "description is $description"
     def event = zigbee.getEvent(description)
+    def descMap = zigbee.parseDescriptionAsMap(description)
     def powerDiv = 1
     def energyDiv = 100
 
     if (event) {
         log.info "event enter:$event"
-        if (event.name== "power") {
+        if (event.name == "switch" && !descMap.isClusterSpecific && descMap.commandInt == 0x0B) {
+            log.info "Ignoring default response with desc map: $descMap"
+            return [:]
+        } else if (event.name== "power") {
             event.value = event.value/powerDiv
             event.unit = "W"
         } else if (event.name== "energy") {
@@ -81,7 +86,6 @@ def parse(String description) {
         sendEvent(event)
     } else {
         List result = []
-        def descMap = zigbee.parseDescriptionAsMap(description)
         log.debug "Desc Map: $descMap"
 
         List attrData = [[clusterInt: descMap.clusterInt ,attrInt: descMap.attrInt, value: descMap.value]]
