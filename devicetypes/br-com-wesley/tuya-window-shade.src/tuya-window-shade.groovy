@@ -28,9 +28,6 @@ private getDP_TYPE_BOOL() { 0x0100 }
 private getDP_TYPE_VALUE() { 0x0200 }
 private getDP_TYPE_ENUM() { 0x0400 }
 
-private getLEVEL_OPEN () { 0 }
-private getLEVEL_CLOSED () { 100 }
-
 private getPACKET_ID() {
 	state.packetID = ((state.packetID ?: 0) + 1 ) % 256
 	return state.packetID
@@ -62,7 +59,6 @@ metadata {
 	preferences {
 		input "preset", "number", title: "Preset position", description: "Set the window shade preset position", defaultValue: 50, range: "0..100", required: false, displayDuringSetup: false
 		input "reverse", "enum", title: "Direction", description: "Set direction of curtain motor. [WARNING!! Please set curtain position to 50% before changing this preference option.]", options: ["Forward", "Reverse"], defaultValue: "Forward", required: false, displayDuringSetup: false
-		input "fixpercent", "enum", title: "Fix percent", description: "Set 'Fix percent' option unless open is 100% and close is 0%. [WARNING: Please set curtain position to 50% before changing this preference option.]", options: ["Default", "Fix percent"], defaultValue: "Leave it", required: false, displayDuringSetup: false
 	}
 
 	tiles(scale: 2) {
@@ -96,6 +92,12 @@ metadata {
 	}
 }
 
+def currentLevel () {
+	def value = device.currentValue("level")
+    if (value == 0) return 100
+    else if (value == 100) return 0
+    return value
+}
 // Parse incoming device messages to generate events
 def parse(String description) {
 	if (description?.startsWith('catchall:') || description?.startsWith('read attr -')) {
@@ -125,17 +127,24 @@ def parse(String description) {
                         def fncmd = descMap?.data[6..-1]
                         log.debug "dp=" + dp + "  fncmd=" + fncmd
 						if (fncmd[0] == "02") {
-							log.debug "opening"
-							levelEventMoving(LEVEL_OPEN)
+							levelEventMoving(reverse != "Reverse")
 						} else if (fncmd[0] == "00") {
-							log.debug "closing"
-							levelEventMoving(LEVEL_CLOSED)
+							levelEventMoving(reverse == "Reverse")
 						}
 						break
 					case 0x02: // 0x02: Percent control -- Started moving to position (triggered from Zigbee)
                         def fncmd = descMap?.data[6..-1]
                         log.debug "dp=" + dp + "  fncmd=" + fncmd
-						levelEventMoving(levelVal(zigbee.convertHexToInt(fncmd[3])))
+                    	def actualLevel = currentLevel()
+                        def expectedLevel = zigbee.convertHexToInt(fncmd[3])
+                        log.debug "actual=$actualLevel / expected=$expectedLevel"
+                        if (expectedLevel == 100) {
+							levelEventMoving(true)
+                        } else if (expectedLevel == 0) {
+							levelEventMoving(false)
+                        } else {
+							levelEventMoving(actualLevel > expectedLevel)
+                        }
 						break
 					case 0x03: // 0x03: Percent state -- Arrived at position
                         def fncmd = descMap?.data[6..-1]
@@ -147,20 +156,9 @@ def parse(String description) {
                         log.debug "dp=" + dp + "  fncmd=" + fncmd
                     	log.debug "Direction: ${fncmd[0] == "00"?"Forward":"Reverse"}"
                         break
-					case 0x07: // 0x07: Work state -- Started moving (triggered by transmitter or pulling on curtain)
-                        def fncmd = descMap?.data[6..-1]
-                    	if (fncmd[0] == "00") {
-                        	log.debug "dp=" + dp + "  fncmd=" + fncmd
-                    		def level = currentLevel()
-                            if (level == LEVEL_CLOSED && device.currentValue("windowShade") != "closed") {
-                                log.debug "moving from position $level : must be opening"
-                                levelEventMoving(LEVEL_OPEN)
-                            } else if (level == LEVEL_OPEN && device.currentValue("windowShade") != "open") {
-                                log.debug "moving from position $level : must be closing"
-                                levelEventMoving(LEVEL_CLOSED)
-                            }
-                        }
-						break
+                    case 0x07:
+                    // do nothing
+                    	break
                     default:
                     	log.debug "DP: $dp / DATA: ${descMap?.data}"
 				}
@@ -169,14 +167,10 @@ def parse(String description) {
 	}
 }
 
-private levelEventMoving (expectedValue) {
-	def actualValue = currentLevel()
-	log.debug "levelEventMoving - actual: ${actualValue} / expected: ${expectedValue}"
-    if (actualValue > expectedValue) {
-        sendEvent(name:"windowShade", value: "opening")
-    } else if (actualValue < expectedValue) {
-        sendEvent(name:"windowShade", value: "closing")
-    }
+private levelEventMoving (open) {
+	def value = (open?"opening":"closing")
+    log.debug value
+	sendEvent(name:"windowShade", value: value)
 }
 
 def sendSwitchCommandIfNeeded(value) {
@@ -187,23 +181,24 @@ def sendSwitchCommandIfNeeded(value) {
 }
 
 private levelEventArrived (level) {
-	if (level == LEVEL_CLOSED) {
+	if (level == 100) {
 		sendEvent(name: "windowShade", value: "closed")
         sendSwitchCommandIfNeeded(0x00)
-	} else if (level == LEVEL_OPEN) {
+        sendEvent(name: "level", value: 0)
+	} else if (level == 0) {
 		sendEvent(name: "windowShade", value: "open")
         sendSwitchCommandIfNeeded(0x01)
+        sendEvent(name: "level", value: 100)
 	} else if (0 < level && level < 100) {
 		sendEvent(name: "windowShade", value: "partially open")
         sendSwitchCommandIfNeeded(0x01)
+        sendEvent(name: "level", value: level)
 	} else {
 		log.debug "Position value error (${level}) : Please remove the device from Smartthings, and setup limit of the curtain before pairing."
 		sendEvent(name: "windowShade", value: "partially open")
 		sendEvent(name: "level", value: 50)
         sendSwitchCommandIfNeeded(0x01)
-		return
 	}
-	sendEvent(name: "level", value: levelVal(level))
 }
 
 def on() {
@@ -216,14 +211,12 @@ def off() {
 
 def close() {
 	log.info "close()"
-    commandControl(0x00) + 
-    setLevel(levelVal(100 - LEVEL_CLOSED))
+    setLevel(0)
 }
 
 def open() {
 	log.info "open()"
-    commandControl(0x02) + 
-    setLevel(levelVal(100 - LEVEL_OPEN))
+    setLevel(100)
 }
 
 def pause() {
@@ -232,11 +225,18 @@ def pause() {
 }
 
 def setLevel(value, rate = null) {
-	log.info "setLevel("+value+")"
-    if (value == LEVEL_CLOSED) {
-    	return commandPercentControl(value) + zigbee.command(zigbee.ONOFF_CLUSTER, 0x00, "")
+	log.info "setLevel($value)"
+    if (value == 0) {
+    	return commandControl(0x02) +
+        commandPercentControl(0) +
+        zigbee.command(zigbee.ONOFF_CLUSTER, 0x00, "")
     }
-    return zigbee.command(zigbee.ONOFF_CLUSTER, 0x01, "") + commandPercentControl(value)
+    if (value == 100) {
+    	return commandControl(0x00) +
+        commandPercentControl(100) +
+        zigbee.command(zigbee.ONOFF_CLUSTER, 0x01, "")
+    }
+    return commandPercentControl(value) + zigbee.command(zigbee.ONOFF_CLUSTER, 0x01, "")
 }
 
 
@@ -258,7 +258,7 @@ def commandControl (value) {
 	sendTuyaCommand(0x01, DP_TYPE_ENUM, zigbee.convertToHexString(value))
 }
 def commandPercentControl (value) {
-	sendTuyaCommand(0x02, DP_TYPE_VALUE, zigbee.convertToHexString(levelVal(value), 8))
+	sendTuyaCommand(0x02, DP_TYPE_VALUE, zigbee.convertToHexString(value, 8))
 }
 def commandControlBack (value) {
 	sendTuyaCommand(0x05, DP_TYPE_ENUM, zigbee.convertToHexString(value?1:0))
@@ -267,19 +267,11 @@ def commandControlBack (value) {
 private sendTuyaCommand(dp, dp_type, fncmd) {
 	def status = 0
     def transid = PACKET_ID
-    def length = (fncmd.length()/2).intValue()
+    def length = (fncmd.length() / 2).intValue()
 	def data = DataType.pack(status, DataType.UINT8) + DataType.pack(transid, DataType.UINT8) + DataType.pack(dp + dp_type, DataType.UINT16, true) + DataType.pack(length, DataType.UINT16) + fncmd
 
 	log.info data
 	zigbee.command(CLUSTER_TUYA, SETDATA, data)
-}
-
-private levelVal (n) {
-	return (int)(fixpercent == "Fix percent"?100 - n:n)
-}
-
-def currentLevel () {
-	levelVal(device.currentValue("level"))
 }
 
 def refresh () {
