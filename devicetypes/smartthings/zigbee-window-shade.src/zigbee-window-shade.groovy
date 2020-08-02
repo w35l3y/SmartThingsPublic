@@ -103,7 +103,7 @@ def parse(String description) {
 			log.debug "attr: ${descMap?.attrInt}, value: ${descMap?.value}, descValue: ${Integer.parseInt(descMap.value, 16)}, ${device.getDataValue("model")}"
 			List<Map> descMaps = collectAttributes(descMap)
 			def liftmap = descMaps.find { it.attrInt == ATTRIBUTE_POSITION_LIFT }
-			if (liftmap && liftmap.value) {
+			if (liftmap && liftmap.value != "32") {	// != 50%
 				def newLevel = zigbee.convertHexToInt(liftmap.value)
 				if (shouldInvertLiftPercentage()) {
 					// some devices report % level of being closed (instead of % level of being opened)
