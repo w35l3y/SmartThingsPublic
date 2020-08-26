@@ -1,0 +1,41 @@
+{
+    "id": "valleyboard16460.wledeffectmode",
+    "version": 1,
+    "status": "proposed",
+    "name": "wledeffectmode",
+    "attributes": {
+        "effectMode": {
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "value": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0
+                    }
+                },
+                "additionalProperties": false,
+                "required": [
+                    "value"
+                ]
+            },
+            "setter": "setEffectMode",
+            "enumCommands": []
+        }
+    },
+    "commands": {
+        "setEffectMode": {
+            "name": "setEffectMode",
+            "arguments": [
+                {
+                    "name": "effectMode",
+                    "optional": false,
+                    "schema": {
+                        "type": "integer",
+                        "minimum": 0
+                    }
+                }
+            ]
+        }
+    }
+}
